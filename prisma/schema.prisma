@@ -47,7 +47,7 @@ model ContactCategory {
   hangoutVisibilities HangoutVisibility[]
 
   @@unique([userId, name]) // Prevent duplicate category names per user
-  @@index([categoryId])
+  @@index([userId])
 }
 
 // Contact request status
