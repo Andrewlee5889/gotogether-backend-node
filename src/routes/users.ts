@@ -4,16 +4,16 @@ import { firebaseAuth } from "../middleware/firebaseAuth";
 
 const router = Router();
 
+// Auth-only endpoints (define BEFORE dynamic :id routes to avoid shadowing)
+router.get("/me", firebaseAuth, getMe);
+router.post("/sync", firebaseAuth, syncUser);
+
 // Users CRUD
 router.get("/", listUsers);
 router.get("/:id", getUser);
 router.post("/", createUser);
 router.put("/:id", updateUser);
 router.delete("/:id", deleteUser);
-
-// Auth-only endpoints
-router.get("/me", firebaseAuth, getMe);
-router.post("/sync", firebaseAuth, syncUser);
 
 // Contacts
 

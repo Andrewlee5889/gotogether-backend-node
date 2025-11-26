@@ -1,27 +1,36 @@
 import request from 'supertest';
 import app from '../src/app';
 
-const findMany = jest.fn();
-const create = jest.fn();
-const findUnique = jest.fn();
-const update = jest.fn();
-const deleteRecord = jest.fn();
-const transaction = jest.fn();
-
+// Inline mocks inside jest.mock to avoid TDZ/hoisting issues
 jest.mock('../src/db', () => ({
   prisma: {
-    contact: { findMany, create, findUnique, update, delete: deleteRecord },
-    $transaction: transaction,
+    contact: {
+      findMany: jest.fn(),
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+    $transaction: jest.fn(),
   },
 }));
+
+// Get a typed handle to the mocked prisma
+const { prisma } = require('../src/db');
 
 describe('Contact approval flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (prisma.contact.findMany as jest.Mock).mockReset();
+    (prisma.contact.create as jest.Mock).mockReset();
+    (prisma.contact.findUnique as jest.Mock).mockReset();
+    (prisma.contact.update as jest.Mock).mockReset();
+    (prisma.contact.delete as jest.Mock).mockReset();
+    (prisma.$transaction as jest.Mock).mockReset();
   });
 
   it('creates pending contact request', async () => {
-    create.mockResolvedValue({
+    (prisma.contact.create as jest.Mock).mockResolvedValue({
       contactId: 'u2', createdAt: new Date(), status: 'PENDING',
       contact: { id: 'u2', displayName: 'Alice', email: 'alice@example.com', photoUrl: null },
       category: null,
@@ -32,13 +41,13 @@ describe('Contact approval flow', () => {
       .send({ contactId: 'u2' });
 
     expect(res.status).toBe(201);
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+    expect(prisma.contact.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ userId: 'u1', contactId: 'u2', status: 'PENDING' }),
     }));
   });
 
   it('lists only accepted contacts', async () => {
-    findMany.mockResolvedValue([
+    (prisma.contact.findMany as jest.Mock).mockResolvedValue([
       {
         contactId: 'u2', createdAt: new Date(),
         contact: { id: 'u2', displayName: 'Alice', email: 'alice@example.com', photoUrl: null },
@@ -48,13 +57,13 @@ describe('Contact approval flow', () => {
 
     const res = await request(app).get('/api/contacts/u1');
     expect(res.status).toBe(200);
-    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+    expect(prisma.contact.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { userId: 'u1', status: 'ACCEPTED' },
     }));
   });
 
   it('lists pending incoming requests', async () => {
-    findMany.mockResolvedValue([
+    (prisma.contact.findMany as jest.Mock).mockResolvedValue([
       {
         userId: 'u2', createdAt: new Date(),
         user: { id: 'u2', displayName: 'Alice', email: 'alice@example.com', photoUrl: null },
@@ -63,26 +72,26 @@ describe('Contact approval flow', () => {
 
     const res = await request(app).get('/api/contacts/u1/requests/pending');
     expect(res.status).toBe(200);
-    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+    expect(prisma.contact.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { contactId: 'u1', status: 'PENDING' },
     }));
     expect(res.body[0].id).toBe('u2');
   });
 
   it('accepts contact request and creates reciprocal edge', async () => {
-    findUnique.mockResolvedValue({ userId: 'u2', contactId: 'u1', status: 'PENDING' });
-    transaction.mockResolvedValue([{}, {}]);
+    (prisma.contact.findUnique as jest.Mock).mockResolvedValue({ userId: 'u2', contactId: 'u1', status: 'PENDING' });
+    (prisma.$transaction as jest.Mock).mockResolvedValue([{}, {}]);
 
     const res = await request(app).post('/api/contacts/u1/requests/u2/accept');
     expect(res.status).toBe(200);
-    expect(transaction).toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalled();
   });
 
   it('rejects contact request by deleting it', async () => {
-    deleteRecord.mockResolvedValue({});
+    (prisma.contact.delete as jest.Mock).mockResolvedValue({});
 
     const res = await request(app).post('/api/contacts/u1/requests/u2/reject');
     expect(res.status).toBe(204);
-    expect(deleteRecord).toHaveBeenCalled();
+    expect(prisma.contact.delete).toHaveBeenCalled();
   });
 });
