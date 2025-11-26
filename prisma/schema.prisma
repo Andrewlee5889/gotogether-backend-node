@@ -1,0 +1,114 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model - stores Firebase UIDs and basic user info
+model User {
+  id        String   @id @default(cuid())
+  firebaseUid String @unique // Firebase Authentication UID
+  email     String?  @unique
+  displayName String?
+  photoUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  hangouts  Hangout[]
+  contacts  Contact[] @relation("UserContacts")
+  contactOf Contact[] @relation("ContactUser")
+  categories ContactCategory[]
+  hangoutVisibilities HangoutVisibility[]
+
+  @@index([firebaseUid])
+  @@index([email])
+}
+
+// Contact categories for organizing contacts
+model ContactCategory {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  color     String?  // Optional color for UI
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contacts  Contact[]
+  hangoutVisibilities HangoutVisibility[]
+
+  @@unique([userId, name]) // Prevent duplicate category names per user
+  @@index([userId])
+}
+
+// Contacts - users can add other users as contacts
+model Contact {
+  id         String   @id @default(cuid())
+  userId     String   // The user who owns this contact
+  contactId  String   // The user being added as a contact
+  categoryId String?  // Optional category (null = default/uncategorized)
+  nickname   String?  // Optional custom nickname for this contact
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  user       User            @relation("UserContacts", fields: [userId], references: [id], onDelete: Cascade)
+  contact    User            @relation("ContactUser", fields: [contactId], references: [id], onDelete: Cascade)
+  category   ContactCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, contactId]) // Prevent duplicate contacts
+  @@index([userId])
+  @@index([contactId])
+  @@index([categoryId])
+}
+
+// Hangouts - events created by users
+model Hangout {
+  id          String   @id @default(cuid())
+  userId      String   // Creator of the hangout
+  title       String
+  description String?
+  location    String?  // Store as JSON string with lat/lng or address
+  latitude    Float?   // For geolocation queries
+  longitude   Float?   // For geolocation queries
+  startsAt    DateTime
+  endsAt      DateTime?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visibilities HangoutVisibility[]
+
+  @@index([userId])
+  @@index([startsAt])
+  @@index([isPublic])
+  @@index([latitude, longitude]) // For location-based queries
+}
+
+// Hangout visibility - controls who can see private hangouts
+model HangoutVisibility {
+  id         String   @id @default(cuid())
+  hangoutId  String
+  categoryId String?  // If set, visible to contacts in this category
+  userId     String?  // If set, visible to this specific user
+  createdAt  DateTime @default(now())
+
+  // Relations
+  hangout    Hangout         @relation(fields: [hangoutId], references: [id], onDelete: Cascade)
+  category   ContactCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user       User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([hangoutId])
+  @@index([categoryId])
+  @@index([userId])
+}

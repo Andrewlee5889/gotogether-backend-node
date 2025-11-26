@@ -4,7 +4,7 @@ import cors from "cors";
 import healthRoutes from "./routes/health";
 import hangoutsRoutes from "./routes/hangouts";
 import usersRoutes from "./routes/users";
-import membershipsRoutes from "./routes/memberships";
+import contactsRoutes from "./routes/contacts";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(healthRoutes);
 app.use("/api/hangouts", hangoutsRoutes);
 app.use("/api/users", usersRoutes);
-app.use("/api/memberships", membershipsRoutes);
+app.use("/api/contacts", contactsRoutes);
 
 app.listen(port, () => {
   console.log(`API listening on port ${port}`);
