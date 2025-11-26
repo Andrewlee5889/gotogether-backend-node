@@ -91,8 +91,10 @@ export default router;
 **New API Endpoint**: Create route file in `src/routes/`, import into `src/index.ts` and mount with `app.use()`
 **Database Changes**: 
   1. Modify `prisma/schema.prisma`
-  2. Run `npm run prisma:migrate` to create migration
-  3. Prisma Client auto-regenerates with new types
+  2. Run `npm run prisma:migrate` to create migration (dev environment)
+  3. Migration files are generated in `prisma/migrations/` - commit these to Git
+  4. Prisma Client auto-regenerates with new types
+  5. On Heroku deployment, `prisma migrate deploy` runs automatically via Procfile
 **Environment Variables**: Add to `.env` file (DATABASE_URL, PORT, NODE_ENV currently used)
 **Error Handling**: Always wrap Prisma queries in try/catch, log errors, return appropriate HTTP status
 

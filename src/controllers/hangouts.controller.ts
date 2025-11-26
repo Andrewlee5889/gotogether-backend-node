@@ -3,11 +3,73 @@ import { prisma } from "../db";
 
 export async function listHangouts(req: Request, res: Response) {
   try {
-    const { userId } = req.query as { userId?: string };
-    const where = userId ? { userId } : {};
+    const {
+      userId,
+      title,
+      isPublic,
+      startsAtFrom,
+      startsAtTo,
+      endsAtFrom,
+      endsAtTo,
+      latMin,
+      latMax,
+      lngMin,
+      lngMax,
+      orderBy = "startsAt",
+      orderDir = "asc",
+      page = "1",
+      limit = "25",
+      interestId,
+      interestSlug,
+    } = req.query as Record<string, string>;
+
+    const where: any = {};
+    if (userId) where.userId = userId;
+    if (title) where.title = { contains: title, mode: "insensitive" };
+    if (typeof isPublic !== "undefined") where.isPublic = isPublic === "true";
+    if (startsAtFrom || startsAtTo) where.startsAt = {
+      ...(startsAtFrom ? { gte: new Date(startsAtFrom) } : {}),
+      ...(startsAtTo ? { lte: new Date(startsAtTo) } : {}),
+    };
+    if (endsAtFrom || endsAtTo) where.endsAt = {
+      ...(endsAtFrom ? { gte: new Date(endsAtFrom) } : {}),
+      ...(endsAtTo ? { lte: new Date(endsAtTo) } : {}),
+    };
+    if (latMin || latMax) where.latitude = {
+      ...(latMin ? { gte: parseFloat(latMin) } : {}),
+      ...(latMax ? { lte: parseFloat(latMax) } : {}),
+    };
+    if (lngMin || lngMax) where.longitude = {
+      ...(lngMin ? { gte: parseFloat(lngMin) } : {}),
+      ...(lngMax ? { lte: parseFloat(lngMax) } : {}),
+    };
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
     const hangouts = await prisma.hangout.findMany({
       where,
-      orderBy: { startsAt: "asc" },
+      orderBy: { [orderBy as string]: orderDir === "desc" ? "desc" : "asc" },
+      skip,
+      take,
+      ...(interestId || interestSlug
+        ? {
+            // Filter hangouts where creator has the specified interest
+            // Uses relation through User -> UserInterest -> Interest
+            where: {
+              ...where,
+              user: {
+                userInterests: {
+                  some: interestId
+                    ? { interestId }
+                    : {
+                        interest: { slug: interestSlug as string },
+                      },
+                },
+              },
+            },
+          }
+        : {}),
       select: {
         id: true,
         userId: true,

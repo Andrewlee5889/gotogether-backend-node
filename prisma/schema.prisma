@@ -26,6 +26,7 @@ model User {
   contactOf Contact[] @relation("ContactUser")
   categories ContactCategory[]
   hangoutVisibilities HangoutVisibility[]
+  userInterests UserInterest[]
 
   @@index([firebaseUid])
   @@index([email])
@@ -46,16 +47,21 @@ model ContactCategory {
   hangoutVisibilities HangoutVisibility[]
 
   @@unique([userId, name]) // Prevent duplicate category names per user
-  @@index([userId])
+  @@index([categoryId])
+}
+
+// Contact request status
+enum ContactStatus {
+  PENDING
+  ACCEPTED
 }
 
 // Contacts - users can add other users as contacts
 model Contact {
-  id         String   @id @default(cuid())
   userId     String   // The user who owns this contact
   contactId  String   // The user being added as a contact
   categoryId String?  // Optional category (null = default/uncategorized)
-  nickname   String?  // Optional custom nickname for this contact
+  status     ContactStatus @default(PENDING) // Approval status
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -64,7 +70,8 @@ model Contact {
   contact    User            @relation("ContactUser", fields: [contactId], references: [id], onDelete: Cascade)
   category   ContactCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, contactId]) // Prevent duplicate contacts
+  // Composite primary key on userId + contactId (directed edge)
+  @@id([userId, contactId])
   @@index([userId])
   @@index([contactId])
   @@index([categoryId])
@@ -111,4 +118,30 @@ model HangoutVisibility {
   @@index([hangoutId])
   @@index([categoryId])
   @@index([userId])
+}
+
+// Interest tags that users can opt into
+model Interest {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  users       UserInterest[]
+}
+
+// User's selected interests (tags)
+model UserInterest {
+  userId     String
+  interestId String
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interest Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([userId, interestId])
+  @@index([userId])
+  @@index([interestId])
 }

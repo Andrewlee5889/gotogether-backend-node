@@ -1,18 +1,6 @@
 import { Router } from "express";
-import {
-  listUsers,
-  getUser,
-  createUser,
-  updateUser,
-  deleteUser,
-  listContacts,
-  addContact,
-  removeContact,
-  listCategories,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-} from "../controllers/users.controller";
+import { listUsers, getUser, createUser, updateUser, deleteUser, getMe, syncUser } from "../controllers/users.controller";
+import { firebaseAuth } from "../middleware/firebaseAuth";
 
 const router = Router();
 
@@ -23,15 +11,10 @@ router.post("/", createUser);
 router.put("/:id", updateUser);
 router.delete("/:id", deleteUser);
 
-// Contacts
-router.get("/:id/contacts", listContacts);
-router.post("/:id/contacts", addContact);
-router.delete("/:id/contacts/:contactId", removeContact);
+// Auth-only endpoints
+router.get("/me", firebaseAuth, getMe);
+router.post("/sync", firebaseAuth, syncUser);
 
-// Categories
-router.get("/:id/categories", listCategories);
-router.post("/:id/categories", createCategory);
-router.put("/:id/categories/:categoryId", updateCategory);
-router.delete("/:id/categories/:categoryId", deleteCategory);
+// Contacts
 
 export default router;
