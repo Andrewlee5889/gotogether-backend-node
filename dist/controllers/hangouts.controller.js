@@ -11,11 +11,45 @@ exports.removeVisibility = removeVisibility;
 const db_1 = require("../db");
 async function listHangouts(req, res) {
     try {
-        const { userId } = req.query;
-        const where = userId ? { userId } : {};
+        const { userId, title, isPublic, startsAtFrom, startsAtTo, endsAtFrom, endsAtTo, latMin, latMax, lngMin, lngMax, orderBy = "startsAt", orderDir = "asc", page = "1", limit = "25", interestId, } = req.query;
+        const where = {};
+        if (userId)
+            where.userId = userId;
+        if (title)
+            where.title = { contains: title, mode: "insensitive" };
+        if (typeof isPublic !== "undefined")
+            where.isPublic = isPublic === "true";
+        if (startsAtFrom || startsAtTo)
+            where.startsAt = {
+                ...(startsAtFrom ? { gte: new Date(startsAtFrom) } : {}),
+                ...(startsAtTo ? { lte: new Date(startsAtTo) } : {}),
+            };
+        if (endsAtFrom || endsAtTo)
+            where.endsAt = {
+                ...(endsAtFrom ? { gte: new Date(endsAtFrom) } : {}),
+                ...(endsAtTo ? { lte: new Date(endsAtTo) } : {}),
+            };
+        if (latMin || latMax)
+            where.latitude = {
+                ...(latMin ? { gte: parseFloat(latMin) } : {}),
+                ...(latMax ? { lte: parseFloat(latMax) } : {}),
+            };
+        if (lngMin || lngMax)
+            where.longitude = {
+                ...(lngMin ? { gte: parseFloat(lngMin) } : {}),
+                ...(lngMax ? { lte: parseFloat(lngMax) } : {}),
+            };
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const take = parseInt(limit);
+        // Relational interest filter (by interestId only; slug removed)
+        if (interestId) {
+            where.User = { UserInterest: { some: { interestId } } };
+        }
         const hangouts = await db_1.prisma.hangout.findMany({
             where,
-            orderBy: { startsAt: "asc" },
+            orderBy: { [orderBy]: orderDir === "desc" ? "desc" : "asc" },
+            skip,
+            take,
             select: {
                 id: true,
                 userId: true,
@@ -42,7 +76,7 @@ async function getHangout(req, res) {
         const { id } = req.params;
         const hangout = await db_1.prisma.hangout.findUnique({
             where: { id },
-            include: { visibilities: true },
+            include: { HangoutVisibility: true },
         });
         if (!hangout)
             return res.status(404).json({ error: "Hangout not found" });

@@ -5,13 +5,8 @@ exports.getUser = getUser;
 exports.createUser = createUser;
 exports.updateUser = updateUser;
 exports.deleteUser = deleteUser;
-exports.listContacts = listContacts;
-exports.addContact = addContact;
-exports.removeContact = removeContact;
-exports.listCategories = listCategories;
-exports.createCategory = createCategory;
-exports.updateCategory = updateCategory;
-exports.deleteCategory = deleteCategory;
+exports.getMe = getMe;
+exports.syncUser = syncUser;
 const db_1 = require("../db");
 async function listUsers(_req, res) {
     try {
@@ -85,102 +80,46 @@ async function deleteUser(req, res) {
         res.status(500).json({ error: "Failed to delete user" });
     }
 }
-// Contacts
-async function listContacts(req, res) {
+// Auth: get current user (from Firebase token)
+async function getMe(req, res) {
     try {
-        const { id } = req.params; // userId
-        const contacts = await db_1.prisma.contact.findMany({
-            where: { userId: id },
-            include: {
-                contact: { select: { id: true, displayName: true, email: true, photoUrl: true } },
-                category: { select: { id: true, name: true, color: true } },
+        const authUser = req.authUser;
+        if (!authUser)
+            return res.status(401).json({ error: "Unauthorized" });
+        const user = await db_1.prisma.user.findUnique({ where: { firebaseUid: authUser.uid } });
+        if (!user)
+            return res.status(404).json({ error: "User not found" });
+        res.json(user);
+    }
+    catch (err) {
+        console.error("Failed to get me:", err);
+        res.status(500).json({ error: "Failed to get current user" });
+    }
+}
+// Auth: sync (upsert) user from Firebase token
+async function syncUser(req, res) {
+    try {
+        const authUser = req.authUser;
+        if (!authUser)
+            return res.status(401).json({ error: "Unauthorized" });
+        const user = await db_1.prisma.user.upsert({
+            where: { firebaseUid: authUser.uid },
+            create: {
+                firebaseUid: authUser.uid,
+                email: authUser.email ?? null,
+                displayName: authUser.name ?? null,
+                photoUrl: authUser.picture ?? null,
             },
-            orderBy: { createdAt: "desc" },
-        });
-        res.json(contacts);
-    }
-    catch (err) {
-        console.error("Failed to list contacts:", err);
-        res.status(500).json({ error: "Failed to list contacts" });
-    }
-}
-async function addContact(req, res) {
-    try {
-        const { id } = req.params; // userId
-        const { contactId, categoryId, nickname } = req.body;
-        if (!contactId)
-            return res.status(400).json({ error: "contactId required" });
-        const contact = await db_1.prisma.contact.create({
-            data: { userId: id, contactId, categoryId, nickname },
-            include: {
-                contact: { select: { id: true, displayName: true, email: true, photoUrl: true } },
-                category: { select: { id: true, name: true, color: true } },
+            update: {
+                email: authUser.email ?? null,
+                displayName: authUser.name ?? null,
+                photoUrl: authUser.picture ?? null,
             },
         });
-        res.status(201).json(contact);
+        res.status(200).json(user);
     }
     catch (err) {
-        console.error("Failed to add contact:", err);
-        res.status(500).json({ error: "Failed to add contact" });
-    }
-}
-async function removeContact(req, res) {
-    try {
-        const { id, contactId } = req.params; // userId, contactId
-        await db_1.prisma.contact.delete({ where: { userId_contactId: { userId: id, contactId } } });
-        res.status(204).send();
-    }
-    catch (err) {
-        console.error("Failed to remove contact:", err);
-        res.status(500).json({ error: "Failed to remove contact" });
-    }
-}
-// Categories
-async function listCategories(req, res) {
-    try {
-        const { id } = req.params; // userId
-        const categories = await db_1.prisma.contactCategory.findMany({ where: { userId: id }, orderBy: { name: "asc" } });
-        res.json(categories);
-    }
-    catch (err) {
-        console.error("Failed to list categories:", err);
-        res.status(500).json({ error: "Failed to list categories" });
-    }
-}
-async function createCategory(req, res) {
-    try {
-        const { id } = req.params; // userId
-        const { name, color } = req.body;
-        if (!name)
-            return res.status(400).json({ error: "name required" });
-        const category = await db_1.prisma.contactCategory.create({ data: { userId: id, name, color } });
-        res.status(201).json(category);
-    }
-    catch (err) {
-        console.error("Failed to create category:", err);
-        res.status(500).json({ error: "Failed to create category" });
-    }
-}
-async function updateCategory(req, res) {
-    try {
-        const { id, categoryId } = req.params; // userId, categoryId
-        const { name, color } = req.body;
-        const category = await db_1.prisma.contactCategory.update({ where: { id: categoryId }, data: { name, color } });
-        res.json(category);
-    }
-    catch (err) {
-        console.error("Failed to update category:", err);
-        res.status(500).json({ error: "Failed to update category" });
-    }
-}
-async function deleteCategory(req, res) {
-    try {
-        const { id, categoryId } = req.params;
-        await db_1.prisma.contactCategory.delete({ where: { id: categoryId } });
-        res.status(204).send();
-    }
-    catch (err) {
-        console.error("Failed to delete category:", err);
-        res.status(500).json({ error: "Failed to delete category" });
+        console.error("Failed to sync user:", err);
+        res.status(500).json({ error: "Failed to sync user" });
     }
 }
