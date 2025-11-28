@@ -15,9 +15,9 @@ export async function listInterests(_req: Request, res: Response) {
 // Create a new interest tag
 export async function createInterest(req: Request, res: Response) {
   try {
-    const { name, slug, description } = req.body;
-    if (!name || !slug) return res.status(400).json({ error: "name and slug required" });
-    const tag = await prisma.interest.create({ data: { name, slug, description } });
+    const { name, description } = req.body;
+    if (!name) return res.status(400).json({ error: "name required" });
+    const tag = await prisma.interest.create({ data: { name, description } });
     res.status(201).json(tag);
   } catch (err) {
     console.error("Failed to create interest:", err);
@@ -29,8 +29,8 @@ export async function createInterest(req: Request, res: Response) {
 export async function updateInterest(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { name, slug, description } = req.body;
-    const tag = await prisma.interest.update({ where: { id }, data: { name, slug, description } });
+    const { name, description } = req.body;
+    const tag = await prisma.interest.update({ where: { id }, data: { name, description } });
     res.json(tag);
   } catch (err) {
     console.error("Failed to update interest:", err);
@@ -56,7 +56,7 @@ export async function listUserInterests(req: Request, res: Response) {
     const { userId } = req.params;
     const items = await prisma.userInterest.findMany({
       where: { userId },
-      include: { interest: true },
+      include: { Interest: true },
       orderBy: { createdAt: "desc" },
     });
     res.json(items);

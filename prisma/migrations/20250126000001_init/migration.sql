@@ -71,7 +71,6 @@ CREATE TABLE "HangoutVisibility" (
 CREATE TABLE "Interest" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "slug" TEXT NOT NULL,
     "description" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -139,8 +138,6 @@ CREATE INDEX "HangoutVisibility_userId_idx" ON "HangoutVisibility"("userId");
 -- CreateIndex
 CREATE UNIQUE INDEX "Interest_name_key" ON "Interest"("name");
 
--- CreateIndex
-CREATE UNIQUE INDEX "Interest_slug_key" ON "Interest"("slug");
 
 -- CreateIndex
 CREATE INDEX "UserInterest_userId_idx" ON "UserInterest"("userId");

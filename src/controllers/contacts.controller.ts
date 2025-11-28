@@ -20,15 +20,18 @@ export async function listContacts(req: Request, res: Response) {
     const { userId } = req.params;
     const contacts = await prisma.contact.findMany({
       where: { userId, status: "ACCEPTED" },
-      select: {
-        contactId: true,
-        createdAt: true,
-        contact: { select: { id: true, displayName: true, email: true, photoUrl: true } },
-        category: { select: { id: true, name: true, color: true } },
+      include: {
+        User_Contact_contactIdToUser: { select: { id: true, displayName: true, email: true, photoUrl: true } },
+        ContactCategory: { select: { id: true, name: true, color: true } },
       },
       orderBy: { createdAt: "desc" },
     });
-    res.json(contacts.map(toContactDTO));
+    res.json(contacts.map((item) => toContactDTO({
+      contactId: item.contactId,
+      createdAt: item.createdAt,
+      contact: item.User_Contact_contactIdToUser,
+      category: item.ContactCategory,
+    })));
   } catch (err) {
     console.error("Failed to list contacts:", err);
     res.status(500).json({ error: "Failed to list contacts" });
@@ -40,15 +43,18 @@ export async function getContact(req: Request, res: Response) {
     const { userId, contactId } = req.params;
     const item = await prisma.contact.findUnique({
       where: { userId_contactId: { userId, contactId } },
-      select: {
-        contactId: true,
-        createdAt: true,
-        contact: { select: { id: true, displayName: true, email: true, photoUrl: true } },
-        category: { select: { id: true, name: true, color: true } },
+      include: {
+        User_Contact_contactIdToUser: { select: { id: true, displayName: true, email: true, photoUrl: true } },
+        ContactCategory: { select: { id: true, name: true, color: true } },
       },
     });
     if (!item) return res.status(404).json({ error: "Contact not found" });
-    res.json(toContactDTO(item));
+    res.json(toContactDTO({
+      contactId: item.contactId,
+      createdAt: item.createdAt,
+      contact: item.User_Contact_contactIdToUser,
+      category: item.ContactCategory,
+    }));
   } catch (err) {
     console.error("Failed to get contact:", err);
     res.status(500).json({ error: "Failed to get contact" });
@@ -65,14 +71,17 @@ export async function createContact(req: Request, res: Response) {
     // Create pending contact request (only initiator side)
     const item = await prisma.contact.create({
       data: { userId, contactId, categoryId, status: "PENDING" },
-      select: {
-        contactId: true,
-        createdAt: true,
-        contact: { select: { id: true, displayName: true, email: true, photoUrl: true } },
-        category: { select: { id: true, name: true, color: true } },
+      include: {
+        User_Contact_contactIdToUser: { select: { id: true, displayName: true, email: true, photoUrl: true } },
+        ContactCategory: { select: { id: true, name: true, color: true } },
       },
     });
-    res.status(201).json(toContactDTO(item));
+    res.status(201).json(toContactDTO({
+      contactId: item.contactId,
+      createdAt: item.createdAt,
+      contact: item.User_Contact_contactIdToUser,
+      category: item.ContactCategory,
+    }));
   } catch (err) {
     console.error("Failed to create contact:", err);
     if (typeof err === "object" && err && (err as any).code === "P2002") {
@@ -89,14 +98,17 @@ export async function updateContact(req: Request, res: Response) {
     const item = await prisma.contact.update({
       where: { userId_contactId: { userId, contactId } },
       data: { categoryId },
-      select: {
-        contactId: true,
-        createdAt: true,
-        contact: { select: { id: true, displayName: true, email: true, photoUrl: true } },
-        category: { select: { id: true, name: true, color: true } },
+      include: {
+        User_Contact_contactIdToUser: { select: { id: true, displayName: true, email: true, photoUrl: true } },
+        ContactCategory: { select: { id: true, name: true, color: true } },
       },
     });
-    res.json(toContactDTO(item));
+    res.json(toContactDTO({
+      contactId: item.contactId,
+      createdAt: item.createdAt,
+      contact: item.User_Contact_contactIdToUser,
+      category: item.ContactCategory,
+    }));
   } catch (err) {
     console.error("Failed to update contact:", err);
     res.status(500).json({ error: "Failed to update contact" });
@@ -173,18 +185,16 @@ export async function listPendingRequests(req: Request, res: Response) {
     // Find pending requests where I am the contactId (incoming requests)
     const requests = await prisma.contact.findMany({
       where: { contactId: userId, status: "PENDING" },
-      select: {
-        userId: true,
-        createdAt: true,
-        user: { select: { id: true, displayName: true, email: true, photoUrl: true } },
+      include: {
+        User_Contact_userIdToUser: { select: { id: true, displayName: true, email: true, photoUrl: true } },
       },
       orderBy: { createdAt: "desc" },
     });
     res.json(requests.map((r: any) => ({
-      id: r.user.id,
-      displayName: r.user.displayName,
-      email: r.user.email,
-      photoUrl: r.user.photoUrl,
+      id: r.User_Contact_userIdToUser.id,
+      displayName: r.User_Contact_userIdToUser.displayName,
+      email: r.User_Contact_userIdToUser.email,
+      photoUrl: r.User_Contact_userIdToUser.photoUrl,
       createdAt: r.createdAt,
     })));
   } catch (err) {

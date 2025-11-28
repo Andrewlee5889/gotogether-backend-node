@@ -9,6 +9,8 @@ const config: Config = {
     '^src/(.*)$': '<rootDir>/src/$1',
   },
   clearMocks: true,
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  testTimeout: 10000,
 };
 
 export default config;

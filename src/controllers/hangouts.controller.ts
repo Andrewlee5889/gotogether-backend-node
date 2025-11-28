@@ -20,7 +20,6 @@ export async function listHangouts(req: Request, res: Response) {
       page = "1",
       limit = "25",
       interestId,
-      interestSlug,
     } = req.query as Record<string, string>;
 
     const where: any = {};
@@ -47,29 +46,16 @@ export async function listHangouts(req: Request, res: Response) {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
 
+    // Relational interest filter (by interestId only; slug removed)
+    if (interestId) {
+      where.User = { UserInterest: { some: { interestId } } };
+    }
+
     const hangouts = await prisma.hangout.findMany({
       where,
       orderBy: { [orderBy as string]: orderDir === "desc" ? "desc" : "asc" },
       skip,
       take,
-      ...(interestId || interestSlug
-        ? {
-            // Filter hangouts where creator has the specified interest
-            // Uses relation through User -> UserInterest -> Interest
-            where: {
-              ...where,
-              user: {
-                userInterests: {
-                  some: interestId
-                    ? { interestId }
-                    : {
-                        interest: { slug: interestSlug as string },
-                      },
-                },
-              },
-            },
-          }
-        : {}),
       select: {
         id: true,
         userId: true,
@@ -96,7 +82,7 @@ export async function getHangout(req: Request, res: Response) {
     const { id } = req.params;
     const hangout = await prisma.hangout.findUnique({
       where: { id },
-      include: { visibilities: true },
+      include: { HangoutVisibility: true },
     });
     if (!hangout) return res.status(404).json({ error: "Hangout not found" });
     res.json(hangout);
