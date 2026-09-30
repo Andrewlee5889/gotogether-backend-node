@@ -9,6 +9,8 @@ router.get("/:id", hangouts_controller_1.getHangout);
 router.post("/", hangouts_controller_1.createHangout);
 router.put("/:id", hangouts_controller_1.updateHangout);
 router.delete("/:id", hangouts_controller_1.deleteHangout);
+router.post("/:id/join", hangouts_controller_1.joinHangout);
+router.patch("/:id/participants/:userId", hangouts_controller_1.reviewJoinRequest);
 // Visibility controls
 router.get("/:id/visibility", hangouts_controller_1.listVisibility);
 router.post("/:id/visibility", hangouts_controller_1.addVisibility);
