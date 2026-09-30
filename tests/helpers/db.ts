@@ -10,6 +10,7 @@ export const testPrisma = appPrisma;
  * Maintains referential integrity by deleting in correct order
  */
 export async function cleanDatabase() {
+  await testPrisma.hangoutParticipant.deleteMany();
   await testPrisma.hangoutVisibility.deleteMany();
   await testPrisma.hangout.deleteMany();
   await testPrisma.userInterest.deleteMany();

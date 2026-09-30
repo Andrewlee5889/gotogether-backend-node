@@ -8,6 +8,8 @@ import {
   listVisibility,
   addVisibility,
   removeVisibility,
+  joinHangout,
+  reviewJoinRequest,
 } from "../controllers/hangouts.controller";
 
 const router = Router();
@@ -18,6 +20,8 @@ router.get("/:id", getHangout);
 router.post("/", createHangout);
 router.put("/:id", updateHangout);
 router.delete("/:id", deleteHangout);
+router.post("/:id/join", joinHangout);
+router.patch("/:id/participants/:userId", reviewJoinRequest);
 
 // Visibility controls
 router.get("/:id/visibility", listVisibility);

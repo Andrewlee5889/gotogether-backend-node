@@ -235,6 +235,19 @@ describe('Hangouts API - Integration Tests', () => {
       expect(hangout?.title).toBe('New Hangout');
     });
 
+    it('supports an explicit join policy', async () => {
+      const res = await request(app).post('/api/hangouts').send({
+        userId: user1.id,
+        title: 'Open pickup soccer',
+        startsAt: '2025-12-25T15:00:00Z',
+        isPublic: true,
+        joinPolicy: 'OPEN',
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.joinPolicy).toBe('OPEN');
+    });
+
     it('requires userId, title, and startsAt', async () => {
       const res = await request(app)
         .post('/api/hangouts')
@@ -242,6 +255,65 @@ describe('Hangouts API - Integration Tests', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('required');
+    });
+  });
+
+  describe('hangout participation', () => {
+    it('joins immediately when the policy is OPEN', async () => {
+      const hangout = await testPrisma.hangout.create({
+        data: {
+          userId: user1.id,
+          title: 'Open game',
+          startsAt: new Date('2025-12-01T10:00:00Z'),
+          isPublic: true,
+          joinPolicy: 'OPEN',
+        },
+      });
+
+      const res = await request(app)
+        .post(`/api/hangouts/${hangout.id}/join`)
+        .send({ userId: user2.id });
+
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe('JOINED');
+    });
+
+    it('lets the host approve a request when approval is required', async () => {
+      const hangout = await testPrisma.hangout.create({
+        data: {
+          userId: user1.id,
+          title: 'Small dinner',
+          startsAt: new Date('2025-12-01T10:00:00Z'),
+          isPublic: true,
+          joinPolicy: 'APPROVAL',
+        },
+      });
+
+      const requestRes = await request(app)
+        .post(`/api/hangouts/${hangout.id}/join`)
+        .send({ userId: user2.id });
+      expect(requestRes.status).toBe(202);
+      expect(requestRes.body.status).toBe('PENDING');
+
+      const reviewRes = await request(app)
+        .patch(`/api/hangouts/${hangout.id}/participants/${user2.id}`)
+        .send({ hostUserId: user1.id, approved: true });
+      expect(reviewRes.status).toBe(200);
+      expect(reviewRes.body.status).toBe('JOINED');
+    });
+
+    it('does not allow strangers to join a private hangout', async () => {
+      const hangout = await createTestHangout({
+        userId: user1.id,
+        title: 'Private event',
+        startsAt: new Date('2025-12-01T10:00:00Z'),
+        isPublic: false,
+      });
+
+      const res = await request(app)
+        .post(`/api/hangouts/${hangout.id}/join`)
+        .send({ userId: user2.id });
+      expect(res.status).toBe(403);
     });
   });
 

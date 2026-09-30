@@ -67,6 +67,7 @@ export async function listHangouts(req: Request, res: Response) {
         startsAt: true,
         endsAt: true,
         isPublic: true,
+        joinPolicy: true,
         createdAt: true,
       },
     });
@@ -94,10 +95,10 @@ export async function getHangout(req: Request, res: Response) {
 
 export async function createHangout(req: Request, res: Response) {
   try {
-    const { userId, title, description, location, latitude, longitude, startsAt, endsAt, isPublic } = req.body;
+    const { userId, title, description, location, latitude, longitude, startsAt, endsAt, isPublic, joinPolicy } = req.body;
     if (!userId || !title || !startsAt) return res.status(400).json({ error: "userId, title, startsAt required" });
     const hangout = await prisma.hangout.create({
-      data: { userId, title, description, location, latitude, longitude, startsAt: new Date(startsAt), endsAt: endsAt ? new Date(endsAt) : undefined, isPublic },
+      data: { userId, title, description, location, latitude, longitude, startsAt: new Date(startsAt), endsAt: endsAt ? new Date(endsAt) : undefined, isPublic, joinPolicy },
     });
     res.status(201).json(hangout);
   } catch (err) {
@@ -109,7 +110,7 @@ export async function createHangout(req: Request, res: Response) {
 export async function updateHangout(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { title, description, location, latitude, longitude, startsAt, endsAt, isPublic } = req.body;
+    const { title, description, location, latitude, longitude, startsAt, endsAt, isPublic, joinPolicy } = req.body;
     const hangout = await prisma.hangout.update({
       where: { id },
       data: {
@@ -121,12 +122,59 @@ export async function updateHangout(req: Request, res: Response) {
         startsAt: startsAt ? new Date(startsAt) : undefined,
         endsAt: endsAt ? new Date(endsAt) : undefined,
         isPublic,
+        joinPolicy,
       },
     });
     res.json(hangout);
   } catch (err) {
     console.error("Failed to update hangout:", err);
     res.status(500).json({ error: "Failed to update hangout" });
+  }
+}
+
+export async function joinHangout(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: "userId required" });
+
+    const hangout = await prisma.hangout.findUnique({ where: { id } });
+    if (!hangout) return res.status(404).json({ error: "Hangout not found" });
+    if (hangout.userId === userId) return res.status(400).json({ error: "Hosts are already part of their hangout" });
+    if (!hangout.isPublic) return res.status(403).json({ error: "This hangout is not public" });
+    if (hangout.joinPolicy === "INVITE_ONLY") return res.status(403).json({ error: "This hangout is invite-only" });
+
+    const participant = await prisma.hangoutParticipant.upsert({
+      where: { hangoutId_userId: { hangoutId: id, userId } },
+      update: { status: hangout.joinPolicy === "OPEN" ? "JOINED" : "PENDING" },
+      create: { hangoutId: id, userId, status: hangout.joinPolicy === "OPEN" ? "JOINED" : "PENDING" },
+    });
+    res.status(participant.status === "JOINED" ? 201 : 202).json(participant);
+  } catch (err) {
+    console.error("Failed to join hangout:", err);
+    res.status(500).json({ error: "Failed to join hangout" });
+  }
+}
+
+export async function reviewJoinRequest(req: Request, res: Response) {
+  try {
+    const { id, userId } = req.params;
+    const { hostUserId, approved } = req.body;
+    if (!hostUserId || typeof approved !== "boolean") {
+      return res.status(400).json({ error: "hostUserId and approved are required" });
+    }
+    const hangout = await prisma.hangout.findUnique({ where: { id } });
+    if (!hangout) return res.status(404).json({ error: "Hangout not found" });
+    if (hangout.userId !== hostUserId) return res.status(403).json({ error: "Only the host can review join requests" });
+
+    const participant = await prisma.hangoutParticipant.update({
+      where: { hangoutId_userId: { hangoutId: id, userId } },
+      data: { status: approved ? "JOINED" : "DECLINED" },
+    });
+    res.json(participant);
+  } catch (err) {
+    console.error("Failed to review join request:", err);
+    res.status(500).json({ error: "Failed to review join request" });
   }
 }
 
